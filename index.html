@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECON CIPHER</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #0a0a0a;
+    --white: #f5f5f0;
+    --gray-mid: #888880;
+    --gray-dark: #333330;
+    --border: 1px solid #2a2a2a;
+    --red: #ff4444;
+    --green: #39ff8a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background 0.15s;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* Red flash overlay for wrong answers */
+  #flash-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--red);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9990;
+    transition: opacity 0.05s;
+  }
+
+  /* Green flash for correct */
+  #flash-overlay.correct-flash {
+    background: var(--green);
+  }
+
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ====== INTRO ====== */
+  #intro {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #intro::after {
+    content: 'ECON';
+    position: absolute;
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(120px, 25vw, 300px);
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(255,255,255,0.04);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    letter-spacing: -10px;
+    white-space: nowrap;
+  }
+
+  .intro-tag {
+    font-size: 11px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--gray-mid);
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s ease forwards;
+    opacity: 0;
+  }
+
+  .intro-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(52px, 10vw, 100px);
+    font-weight: 900;
+    line-height: 0.9;
+    letter-spacing: -2px;
+    margin-bottom: 24px;
+    animation: fadeUp 0.8s 0.2s ease forwards;
+    opacity: 0;
+  }
+
+  .intro-title span {
+    display: block;
+    color: var(--gray-mid);
+    font-weight: 400;
+    font-style: italic;
+    font-size: 0.45em;
+    letter-spacing: 0;
+  }
+
+  .divider {
+    width: 60px; height: 1px;
+    background: var(--gray-dark);
+    margin: 0 auto 48px;
+    animation: expand 0.8s 0.3s ease forwards;
+    transform: scaleX(0);
+  }
+
+  .intro-desc {
+    max-width: 480px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--gray-mid);
+    margin-bottom: 48px;
+    animation: fadeUp 0.8s 0.4s ease forwards;
+    opacity: 0;
+  }
+
+  .btn-primary {
+    display: inline-block;
+    background: var(--white);
+    color: var(--black);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    padding: 18px 48px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    animation: fadeUp 0.8s 0.6s ease forwards;
+    opacity: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--black);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .btn-primary:hover::before { transform: translateX(0); }
+  .btn-primary:hover { color: var(--white); }
+  .btn-primary span { position: relative; z-index: 1; }
+
+  /* ====== GAME ====== */
+  #game { flex-direction: column; }
+
+  .game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 40px;
+    border-bottom: var(--border);
+    flex-shrink: 0;
+  }
+
+  .game-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .progress-bar-wrap {
+    flex: 1;
+    max-width: 300px;
+    margin: 0 40px;
+  }
+
+  .progress-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--gray-mid);
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .progress-bar { height: 2px; background: var(--gray-dark); }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--white);
+    transition: width 0.5s ease;
+  }
+
+  .timer-display {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timer-display.warning { color: var(--red); animation: pulse 1s infinite; }
+
+  /* ====== QUESTION AREA ====== */
+  .question-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+    max-width: 780px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .question-number {
+    font-size: 10px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--gray-mid);
+    margin-bottom: 24px;
+  }
+
+  /* Glitch text effect on question */
+  .question-text {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.3;
+    margin-bottom: 16px;
+    min-height: 100px;
+    position: relative;
+  }
+
+  .question-text.glitch {
+    animation: glitchText 0.6s ease forwards;
+  }
+
+  .question-sub {
+    font-size: 11px;
+    color: var(--gray-dark);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  /* ====== KEYWORD BUTTONS ====== */
+  .keywords-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    max-width: 620px;
+    margin-bottom: 40px;
+  }
+
+  .kw-btn {
+    background: transparent;
+    border: 1px solid var(--gray-dark);
+    color: var(--white);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 14px 28px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, transform 0.2s;
+    position: relative;
+    min-width: 160px;
+  }
+
+  .kw-btn:hover {
+    border-color: var(--white);
+    transform: translateY(-2px);
+  }
+
+  /* Correct */
+  .kw-btn.correct {
+    border-color: var(--green);
+    color: var(--green);
+    animation: correctPop 0.5s ease forwards;
+    pointer-events: none;
+  }
+
+  /* Wrong */
+  .kw-btn.wrong {
+    border-color: var(--red);
+    color: var(--red);
+    animation: wrongShake 0.4s ease forwards;
+    pointer-events: none;
+  }
+
+  /* Reveal correct after wrong */
+  .kw-btn.reveal {
+    border-color: var(--green);
+    color: var(--green);
+    pointer-events: none;
+  }
+
+  .kw-btn:disabled { pointer-events: none; opacity: 0.25; }
+
+  /* Scramble span inside each button */
+  .kw-btn .label { display: inline-block; }
+
+  /* ====== FEEDBACK ====== */
+  .feedback-bar {
+    width: 100%;
+    max-width: 620px;
+    padding: 16px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    opacity: 0;
+    transition: opacity 0.4s;
+    border-left: 2px solid transparent;
+    min-height: 56px;
+  }
+
+  .feedback-bar.show { opacity: 1; }
+  .feedback-bar.correct-fb { border-color: var(--green); color: var(--green); }
+  .feedback-bar.wrong-fb   { border-color: var(--red);   color: var(--red); }
+
+  /* ====== NEXT BTN ====== */
+  .next-btn {
+    background: transparent;
+    border: 1px solid var(--gray-dark);
+    color: var(--gray-mid);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    padding: 14px 36px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+    display: none;
+  }
+
+  .next-btn.show { display: inline-block; }
+  .next-btn:hover { border-color: var(--white); color: var(--white); }
+
+  /* ====== SCORE DOTS ====== */
+  .score-dots { display: flex; gap: 8px; margin-top: 24px; }
+
+  .score-dot {
+    width: 8px; height: 8px;
+    border: 1px solid var(--gray-dark);
+    border-radius: 50%;
+    transition: all 0.3s;
+  }
+
+  .score-dot.correct-dot { background: var(--green); border-color: var(--green); }
+  .score-dot.wrong-dot   { background: var(--red);   border-color: var(--red); }
+
+  /* ====== RESULT ====== */
+  #result {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .result-tag {
+    font-size: 10px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--gray-mid);
+    margin-bottom: 24px;
+  }
+
+  .result-score-display {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(80px, 20vw, 160px);
+    font-weight: 900;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .result-score-label {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--gray-mid);
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  .result-message {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 700;
+    margin-bottom: 16px;
+    max-width: 520px;
+  }
+
+  .result-sub {
+    font-size: 13px;
+    color: var(--gray-mid);
+    max-width: 400px;
+    line-height: 1.8;
+    margin-bottom: 48px;
+  }
+
+  .result-grid {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 56px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .result-stat { text-align: center; }
+
+  .result-stat-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    font-weight: 700;
+  }
+
+  .result-stat-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--gray-mid);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--gray-dark);
+    color: var(--gray-mid);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    padding: 16px 40px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .btn-secondary:hover { border-color: var(--white); color: var(--white); }
+
+  /* ====== ANIMATIONS ====== */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes expand {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes wrongShake {
+    0%   { transform: translateX(0); }
+    20%  { transform: translateX(-8px); }
+    40%  { transform: translateX(8px); }
+    60%  { transform: translateX(-5px); }
+    80%  { transform: translateX(5px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes correctPop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+
+  /* Glitch text keyframes */
+  @keyframes glitchText {
+    0%   { opacity: 1; transform: translateX(0) skewX(0deg); clip-path: none; }
+    10%  { transform: translateX(-4px) skewX(-2deg); opacity: 0.8; }
+    20%  { transform: translateX(4px) skewX(2deg); opacity: 1; }
+    30%  { transform: translateX(-2px); opacity: 0.6; }
+    40%  { transform: translateX(2px) skewX(0); opacity: 1; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Page shake on wrong */
+  @keyframes pageShake {
+    0%   { transform: translateX(0); }
+    15%  { transform: translateX(-10px); }
+    30%  { transform: translateX(10px); }
+    45%  { transform: translateX(-7px); }
+    60%  { transform: translateX(7px); }
+    75%  { transform: translateX(-3px); }
+    100% { transform: translateX(0); }
+  }
+
+  .page-shake {
+    animation: pageShake 0.45s ease;
+  }
+
+  @media (max-width: 540px) {
+    .game-header { padding: 16px 20px; }
+    .progress-bar-wrap { max-width: 140px; margin: 0 16px; }
+    .kw-btn { min-width: 120px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="flash-overlay"></div>
+
+<!-- INTRO -->
+<div class="screen active" id="intro">
+  <div class="intro-tag">Economics · Mystery Edition</div>
+  <h1 class="intro-title">
+    ECON
+    <span>Escape Room</span>
+  </h1>
+  <div class="divider"></div>
+  <p class="intro-desc">
+    Ten questions. Four keywords — but they're scrambled. Hover to decode them,
+    then click the one you believe is correct. Wrong answers cost you time.
+  </p>
+  <button class="btn-primary" onclick="startGame()"><span>BEGIN ESCAPE →</span></button>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="game">
+  <header class="game-header">
+    <div class="game-logo">ECON</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-label" id="progressLabel">QUESTION 1 OF 10</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="timer-display" id="timer">05:00</div>
+  </header>
+
+  <div class="question-area" id="questionArea">
+    <div class="question-number" id="questionNumber">QUESTION 01</div>
+    <div class="question-text" id="questionText"></div>
+    <div class="question-sub">— hover to decode · click to answer —</div>
+    <div class="keywords-list" id="keywordsList"></div>
+    <div class="feedback-bar" id="feedbackBar"></div>
+    <button class="next-btn" id="nextBtn" onclick="nextQuestion()">NEXT QUESTION →</button>
+    <div class="score-dots" id="scoreDots"></div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div class="screen" id="result">
+  <div class="result-tag" id="resultTag">Final Score</div>
+  <div class="result-score-display" id="resultScore">0</div>
+  <div class="result-score-label">out of 10</div>
+  <div class="result-message" id="resultMessage"></div>
+  <p class="result-sub" id="resultSub"></p>
+  <div class="result-grid">
+    <div class="result-stat">
+      <div class="result-stat-val" id="statCorrect">—</div>
+      <div class="result-stat-label">Correct</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-val" id="statTime">—</div>
+      <div class="result-stat-label">Time Left</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-val" id="statAccuracy">—</div>
+      <div class="result-stat-label">Accuracy</div>
+    </div>
+  </div>
+  <button class="btn-primary" onclick="restartGame()"><span>PLAY AGAIN →</span></button>
+  <br><br>
+  <button class="btn-secondary" onclick="showIntro()">← MAIN MENU</button>
+</div>
+
+<script>
+const questions = [
+  {
+    q: "What does GDP stand for?",
+    keywords: ["General Deficit Plan", "Gross Domestic Product", "Global Dev Program", "Govt Debt Percentage"],
+    answer: 1,
+    explanation: "GDP — Gross Domestic Product — is the total monetary value of all goods and services produced within a country in a specific time period."
+  },
+  {
+    q: "What happens to demand when price rises?",
+    keywords: ["Demand rises", "Demand stays same", "Demand falls", "Supply rises"],
+    answer: 2,
+    explanation: "The Law of Demand: as price increases, quantity demanded decreases — an inverse relationship."
+  },
+  {
+    q: "What is inflation?",
+    keywords: ["Rising unemployment", "Falling GDP", "Rising price levels", "Falling interest rates"],
+    answer: 2,
+    explanation: "Inflation is the rate at which the general level of prices rises, eroding purchasing power."
+  },
+  {
+    q: "Which is a fiscal policy tool?",
+    keywords: ["Setting interest rates", "Govt spending increase", "Printing money", "Regulating banks"],
+    answer: 1,
+    explanation: "Fiscal policy involves government spending and taxation. Increasing government spending is a classic expansionary fiscal tool."
+  },
+  {
+    q: "What is opportunity cost?",
+    keywords: ["Money spent on choice", "Next best alternative", "Total production cost", "Profit from a decision"],
+    answer: 1,
+    explanation: "Opportunity cost is the value of the next best alternative you give up when making a choice — a core concept in economics."
+  },
+  {
+    q: "Supply rises, demand constant — what happens to price?",
+    keywords: ["Price rises", "Price falls", "Price unchanged", "Demand rises too"],
+    answer: 1,
+    explanation: "When supply increases with constant demand, the surplus pushes prices down until equilibrium is restored."
+  },
+  {
+    q: "What do central banks use to control inflation?",
+    keywords: ["Tax rates", "Govt spending", "Interest rates", "Trade tariffs"],
+    answer: 2,
+    explanation: "Central banks raise interest rates to reduce borrowing and spending, cooling the economy and bringing inflation down."
+  },
+  {
+    q: "Which system has private ownership and free markets?",
+    keywords: ["Socialism", "Command economy", "Capitalism", "Mixed economy"],
+    answer: 2,
+    explanation: "Capitalism is characterised by private ownership of the means of production and free-market allocation of resources."
+  },
+  {
+    q: "What is a trade deficit?",
+    keywords: ["Exporting > importing", "Importing > exporting", "Balanced trade", "Govt revenue surplus"],
+    answer: 1,
+    explanation: "A trade deficit occurs when a country imports more than it exports, resulting in a negative trade balance."
+  },
+  {
+    q: "One seller controls the entire market. What is this?",
+    keywords: ["Oligopoly", "Duopoly", "Monopoly", "Monopsony"],
+    answer: 2,
+    explanation: "A monopoly is a market structure where a single seller dominates with no close substitutes, giving them significant pricing power."
+  }
+];
+
+// Scramble characters (not letters A-Z to keep it legible as "coded")
+const SCRAMBLE_CHARS = '!@#$%?&*<>[]{}|/\\^~=+';
+
+let currentQ = 0, score = 0, timeLeft = 300, timerInterval = null;
+let scrambleIntervals = []; // track per-button scramble intervals
+
+// ── Scramble / unscramble helpers ──────────────────────────────────────────
+
+function randomChar() {
+  return SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+}
+
+function scrambleText(text) {
+  return text.split('').map(c => c === ' ' ? ' ' : randomChar()).join('');
+}
+
+/** Animate a span from scrambled → real text on hover enter */
+function startUnscramble(span, realText) {
+  let frame = 0;
+  const totalFrames = 14;
+  const id = setInterval(() => {
+    frame++;
+    const ratio = frame / totalFrames;
+    const revealed = Math.floor(ratio * realText.length);
+    span.textContent = realText.slice(0, revealed)
+      + realText.slice(revealed).split('').map(c => c === ' ' ? ' ' : randomChar()).join('');
+    if (frame >= totalFrames) {
+      span.textContent = realText;
+      clearInterval(id);
+    }
+  }, 30);
+  return id;
+}
+
+/** Re-scramble on hover leave */
+function startScramble(span, realText) {
+  let frame = 0;
+  const totalFrames = 10;
+  const id = setInterval(() => {
+    frame++;
+    const ratio = frame / totalFrames;
+    const scrambled = Math.floor(ratio * realText.length);
+    span.textContent = realText.slice(0, realText.length - scrambled).split('').map((c, i) => {
+      return (i >= realText.length - scrambled) ? randomChar() : (Math.random() < 0.3 ? randomChar() : c);
+    }).join('') + scrambleText(realText.slice(realText.length - scrambled));
+    if (frame >= totalFrames) {
+      span.textContent = scrambleText(realText);
+      clearInterval(id);
+    }
+  }, 25);
+  return id;
+}
+
+// ── Flash overlay ──────────────────────────────────────────────────────────
+
+function flashScreen(type) {
+  const overlay = document.getElementById('flash-overlay');
+  overlay.className = type === 'correct' ? 'correct-flash' : '';
+  overlay.style.opacity = '0.18';
+  setTimeout(() => { overlay.style.opacity = '0'; }, 180);
+}
+
+// ── Shake page ─────────────────────────────────────────────────────────────
+
+function shakePage() {
+  const area = document.getElementById('questionArea');
+  area.classList.remove('page-shake');
+  void area.offsetWidth; // reflow
+  area.classList.add('page-shake');
+  setTimeout(() => area.classList.remove('page-shake'), 500);
+}
+
+// ── Screen management ──────────────────────────────────────────────────────
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showIntro() { clearInterval(timerInterval); showScreen('intro'); }
+function restartGame() { startGame(); }
+
+function startGame() {
+  currentQ = 0; score = 0; timeLeft = 300;
+  showScreen('game');
+  buildDots();
+  loadQuestion();
+  startTimer();
+}
+
+// ── Timer ──────────────────────────────────────────────────────────────────
+
+function startTimer() {
+  clearInterval(timerInterval);
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 0) { clearInterval(timerInterval); endGame(); }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+  const el = document.getElementById('timer');
+  el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  el.className = 'timer-display' + (timeLeft <= 30 ? ' warning' : '');
+}
+
+// ── Dots ───────────────────────────────────────────────────────────────────
+
+function buildDots() {
+  const c = document.getElementById('scoreDots');
+  c.innerHTML = '';
+  questions.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'score-dot';
+    d.id = `dot-${i}`;
+    c.appendChild(d);
+  });
+}
+
+// ── Load question ──────────────────────────────────────────────────────────
+
+function loadQuestion() {
+  // Clear any leftover scramble intervals
+  scrambleIntervals.forEach(clearInterval);
+  scrambleIntervals = [];
+
+  const q = questions[currentQ];
+
+  document.getElementById('questionNumber').textContent = `QUESTION ${String(currentQ+1).padStart(2,'0')}`;
+  document.getElementById('progressLabel').textContent = `QUESTION ${currentQ+1} OF ${questions.length}`;
+  document.getElementById('progressFill').style.width = `${(currentQ / questions.length) * 100}%`;
+
+  // Glitch-in the question text
+  const qText = document.getElementById('questionText');
+  qText.classList.remove('glitch');
+  void qText.offsetWidth;
+  qText.textContent = q.q;
+  qText.classList.add('glitch');
+
+  // Build keyword buttons — start scrambled, unscramble on hover
+  const list = document.getElementById('keywordsList');
+  list.innerHTML = '';
+
+  q.keywords.forEach((kw, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'kw-btn';
+
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = scrambleText(kw); // start scrambled
+    btn.appendChild(label);
+
+    let activeInterval = null;
+
+    btn.addEventListener('mouseenter', () => {
+      if (btn.disabled || btn.classList.contains('correct') || btn.classList.contains('wrong')) return;
+      clearInterval(activeInterval);
+      activeInterval = startUnscramble(label, kw);
+    });
+
+    btn.addEventListener('mouseleave', () => {
+      if (btn.disabled || btn.classList.contains('correct') || btn.classList.contains('wrong')) return;
+      clearInterval(activeInterval);
+      activeInterval = startScramble(label, kw);
+    });
+
+    btn.onclick = () => selectAnswer(i, kw);
+    list.appendChild(btn);
+  });
+
+  // Idle scramble — keep non-hovered buttons subtly flickering
+  const idleInterval = setInterval(() => {
+    const btns = document.querySelectorAll('.kw-btn');
+    btns.forEach((btn, i) => {
+      if (btn.disabled || btn.classList.contains('correct') || btn.classList.contains('wrong')) return;
+      const span = btn.querySelector('.label');
+      if (!span) return;
+      const real = q.keywords[i];
+      // Only flicker if text doesn't match real (i.e. still scrambled)
+      if (span.textContent !== real) {
+        span.textContent = scrambleText(real);
+      }
+    });
+  }, 400);
+  scrambleIntervals.push(idleInterval);
+
+  const fb = document.getElementById('feedbackBar');
+  fb.className = 'feedback-bar';
+  fb.textContent = '';
+  document.getElementById('nextBtn').className = 'next-btn';
+}
+
+// ── Select answer ──────────────────────────────────────────────────────────
+
+function selectAnswer(idx, kw) {
+  const q = questions[currentQ];
+  const btns = document.querySelectorAll('.kw-btn');
+
+  // Stop scramble intervals
+  scrambleIntervals.forEach(clearInterval);
+  scrambleIntervals = [];
+
+  // Lock all buttons and reveal their real text
+  btns.forEach((b, i) => {
+    b.disabled = true;
+    const span = b.querySelector('.label');
+    if (span) span.textContent = q.keywords[i];
+  });
+
+  const fb = document.getElementById('feedbackBar');
+  const dot = document.getElementById(`dot-${currentQ}`);
+
+  if (idx === q.answer) {
+    btns[idx].classList.add('correct');
+    fb.className = 'feedback-bar correct-fb show';
+    fb.textContent = `✓ Correct! ${q.explanation}`;
+    dot.className = 'score-dot correct-dot';
+    flashScreen('correct');
+    score++;
+  } else {
+    btns[idx].classList.add('wrong');
+    btns[q.answer].classList.add('reveal');
+    fb.className = 'feedback-bar wrong-fb show';
+    fb.textContent = `✗ Incorrect. ${q.explanation}`;
+    dot.className = 'score-dot wrong-dot';
+    flashScreen('wrong');
+    shakePage();
+    timeLeft = Math.max(0, timeLeft - 5);
+    updateTimerDisplay();
+  }
+
+  document.getElementById('nextBtn').className = 'next-btn show';
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+
+function nextQuestion() {
+  currentQ++;
+  if (currentQ >= questions.length) endGame();
+  else loadQuestion();
+}
+
+// ── End game ───────────────────────────────────────────────────────────────
+
+function endGame() {
+  clearInterval(timerInterval);
+  scrambleIntervals.forEach(clearInterval);
+  const accuracy = Math.round((score / questions.length) * 100);
+  const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+
+  document.getElementById('resultScore').textContent = score;
+  document.getElementById('statCorrect').textContent = score;
+  document.getElementById('statTime').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  document.getElementById('statAccuracy').textContent = `${accuracy}%`;
+
+  let msg, sub, tag;
+  if      (score >= 9) { tag = "Escaped Successfully"; msg = "Economic Mastermind.";  sub = "You navigated the economic crisis with flying colours. Your grasp of economics is exceptional."; }
+  else if (score >= 7) { tag = "Almost Escaped";       msg = "Strong Performance.";   sub = "You have a solid foundation in economics. A bit more revision and you'll be unstoppable."; }
+  else if (score >= 5) { tag = "Partial Escape";       msg = "Decent Effort.";        sub = "You know the basics, but there are some gaps. Review the questions you missed and try again."; }
+  else                 { tag = "Trapped!";             msg = "The Economy Won.";      sub = "Don't worry — every expert starts somewhere. Study up and challenge it again."; }
+
+  document.getElementById('resultTag').textContent = tag;
+  document.getElementById('resultMessage').textContent = msg;
+  document.getElementById('resultSub').textContent = sub;
+  showScreen('result');
+}
+</script>
+</body>
+</html>
